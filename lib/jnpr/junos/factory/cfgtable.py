@@ -95,6 +95,9 @@ class CfgTable(Table):
         # To check if field value is set.
         self._is_field_set = False
 
+        # To store attribute name=value pair.
+        self.attributes = {'field': {}, 'xpath': {}}
+
         # for debug purposes
         self._load_rsp = None
         self._commit_rsp = None
@@ -160,6 +163,9 @@ class CfgTable(Table):
 
             add_field = self._grindfield(lxpath[-1], field_value)
             for _add in add_field:
+                # If attribute set for field name add it to xml tag
+                if field_name in self.attributes['field']:
+                    _add.attrib.update(self.attributes['field'][field_name])
                 if field_name in self.key_field:
                     dot.insert(0, _add)
                 else:
@@ -349,6 +355,8 @@ class CfgTable(Table):
             self.__dict__[fname] = opt['default'] \
                 if 'default' in opt else None
 
+        self.attributes = {'field': {}, 'xpath': {}}
+
     def _mandatory_check(self):
         """ Mandatory checks for set table/view  """
         for key in self.key_field:
@@ -410,6 +418,12 @@ class CfgTable(Table):
         set_cmd = self._buildxml()
         top = set_cmd.find(self._data_dict[self._type])
         self._build_config_xml(top)
+        xpath_attrib = self.attributes['xpath']
+        for item in xpath_attrib:
+            node = top.getroottree().xpath(item)
+            if len(node):
+                node[0].attrib.update(xpath_attrib[item])
+
         if self._config_xml_req is None:
             self._config_xml_req = set_cmd
             self._insert_node = top.getparent()
@@ -617,6 +631,39 @@ class CfgTable(Table):
             self.unlock()
 
         return self
+
+    # -----------------------------------------------------------------------
+    # set_attribute - Add attribute to xml tags.
+    # -----------------------------------------------------------------------
+
+    def set_attribute(self, *vargs, **kvargs):
+        """
+        Add attribute to xml tag for a given table field or xpath.
+
+        :param str vargs[0]:
+          This is the table field name for which attribute is to
+          be set.
+          eg:
+          #For syslog table in 'resources' folder add attribute to
+          #'content_name' field
+          sys.set_attribute('contents_name', delete='delete')
+
+        :param dict kvargs:
+          Attribute name and its value are passed as key, values pairs.
+          name and value passed is added as it is to appropriate xml
+          tag based on value passed in vargs[0].
+          As attribute name and value passed is assumed to be correct
+          care should be taken to pass correct name and value.
+
+          str xpath:
+        """
+        if vargs:
+            self.attributes['field'][vargs[0]] = kvargs
+
+        if 'xpath' in kvargs:
+            xpath = kvargs['xpath']
+            kvargs.pop('xpath', None)
+            self.attributes['xpath'][xpath] = kvargs
 
     # -----------------------------------------------------------------------
     # OVERLOADS
